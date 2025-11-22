@@ -35,7 +35,7 @@ jobs:
       # Upload Spark Job to GCS
       - name: Upload Spark Job to GCS
         run: |
-          gsutil cp spark_job/weather_data_processing.py gs://wether_forcasting_rawzone/script/
+          gsutil cp spark-jobs/weather_data_processing.py gs://wether_forcasting_rawzone/script/
 
       # Upload Airflow DAG to Cloud Composer
       - name: Upload Airflow DAG to Composer
