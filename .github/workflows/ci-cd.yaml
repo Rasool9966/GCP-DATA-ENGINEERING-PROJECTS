@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      id-token: write   # Required for Workload Identity Federation
+      id-token: write   # Required for Workloads Identity Federation
       contents: read
 
     steps:
