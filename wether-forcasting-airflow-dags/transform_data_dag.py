@@ -14,7 +14,7 @@ default_args = {
 
 # Define the DAG
 with DAG(
-    dag_id="transformed_weather_data_to_bq",
+    dag_id="transform_data_dag",
     default_args=default_args,
     schedule_interval=None,
     catchup=False,
