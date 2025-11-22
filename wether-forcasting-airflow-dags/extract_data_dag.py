@@ -71,7 +71,7 @@ with DAG(
     # Task 3 – Trigger the transformation DAG
     trigger_transform_dag = TriggerDagRunOperator(
         task_id="trigger_data_transform_dag",
-        trigger_dag_id="transformed_wether_data_to_bq",
+        trigger_dag_id="transform_data_dag",
         wait_for_completion=False,
     )
 
