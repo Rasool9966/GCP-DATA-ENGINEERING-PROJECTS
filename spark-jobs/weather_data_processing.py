@@ -61,6 +61,7 @@ def main():
            .option("temporaryGcsBucket", temp_bucket)
            .option("createDisposition", "CREATE_IF_NEEDED")
            .option("writeDisposition", "WRITE_APPEND")
+           .mode("append")
            .save()
     )
 
