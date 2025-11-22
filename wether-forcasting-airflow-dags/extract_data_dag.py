@@ -5,7 +5,8 @@ from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.models import Variable
 from datetime import timedelta
-
+import pandas as pd
+import requests
 
 
 default_args = {
@@ -24,63 +25,50 @@ with DAG(
     catchup=False,
     tags=["weather", "data_extraction"],
 ) as dag:
-    
-    #task-1 extract data in venv that reuses system site-packeges
-    def _exteract_openwether_data(api_key: str) -> str:
 
-        import requests
-        import pandas as pd
-
-        endpoint = 'https://api.openweathermap.org/data/2.5/forecast'
-        params = {
-            'q': 'London,uk',
-            'appid': api_key,
-            
-        }
+    # task 1 - extract data in virtualenv (reuse system packages)
+    def _extract_openweather_data(api_key: str) -> str:
+        endpoint = "https://api.openweathermap.org/data/2.5/forecast"
+        params = {"q": "London,uk", "appid": api_key}
 
         response = requests.get(endpoint, params=params)
         response.raise_for_status()
 
-        df = pd.json_normalize(response.json()['list'])
-
+        df = pd.json_normalize(response.json()["list"])
         return df.to_csv(index=False)
-    
+
     extract_weather_data = PythonVirtualenvOperator(
-        task_id ="extract_weather_data",
-        python_callable=_exteract_openwether_data,
+        task_id="extract_weather_data",
+        python_callable=_extract_openweather_data,
         requirements=["requests", "pandas"],
         system_site_packages=True,
-        op_args={"api_key" : Variable.get("OPENWEATHER_API_KEY")},
+        op_args=[Variable.get("OPENWEATHER_API_KEY")],
     )
 
-    # task -2 upload to gcs
-    def _upload_to_gcs(ds : str, **kwargs):
-
-        ti = kwargs['ti']
-        csv_data = ti.xcom_pull(task_ids='extract_weather_data')
+    # task 2 - upload to GCS
+    def _upload_to_gcs(ds: str, **kwargs):
+        ti = kwargs["ti"]
+        csv_data = ti.xcom_pull(task_ids="extract_weather_data")
         hook = GCSHook()
         hook.upload(
-            bucket_name = 'wether_forcasting_rawzone',
-            object_name = f"weather/{ds}/forecast.csv",
-            data = csv_data,
-            mime_type = 'text/csv',
+            bucket_name="wether_forcasting_rawzone",
+            object_name=f"weather/{ds}/forecast.csv",
+            data=csv_data,
+            mime_type="text/csv",
         )
 
-    uplode_to_gcs = PythonOperator(
-        task_id = "upload_to_gcs",
+    upload_to_gcs = PythonOperator(
+        task_id="upload_to_gcs",
         python_callable=_upload_to_gcs,
         op_kwargs={"ds": "{{ ds }}"},
     )
 
-    # task-3 trigger next dag
+    # task 3 - trigger next DAG
     trigger_transform_dag = TriggerDagRunOperator(
         task_id="trigger_data_transform_dag",
         trigger_dag_id="transformed_wether_data_to_bq",
         wait_for_completion=False,
     )
 
-
-
-    #dag structure
-    extract_weather_data >> uplode_to_gcs >> trigger_transform_dag
-
+    # DAG flow
+    extract_weather_data >> upload_to_gcs >> trigger_transform_dag
