@@ -26,7 +26,7 @@ with DAG(
     # Submit PySpark job to Dataproc Serverless
     batch_details = {
         "pyspark_batch": {
-            "main_python_file_uri": f"gs://weather-data-gds/script/weather_data_processing.py",
+            "main_python_file_uri": f"gs://wether_forcasting_rawzone/script/weather_data_processing.py",
             "python_file_uris": [],
             "jar_file_uris": [],
             "args": []
