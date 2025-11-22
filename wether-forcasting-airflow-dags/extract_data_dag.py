@@ -5,8 +5,6 @@ from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.models import Variable
 from datetime import timedelta
-import pandas as pd
-import requests
 
 
 default_args = {
@@ -16,22 +14,28 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
 }
 
+
 with DAG(
     dag_id="extract_data_dag",
     default_args=default_args,
-    description="DAG to extract weather data and upload to GCS",
+    description="DAG to extract weather data from OpenWeather and upload to GCS",
     schedule_interval="@daily",
     start_date=days_ago(1),
     catchup=False,
     tags=["weather", "data_extraction"],
 ) as dag:
 
-    # task 1 - extract data in virtualenv (reuse system packages)
+    # Task 1 – Extract data from OpenWeather API inside a virtualenv
     def _extract_openweather_data(api_key: str) -> str:
+        import requests
+        import pandas as pd
+
         endpoint = "https://api.openweathermap.org/data/2.5/forecast"
         params = {"q": "London,uk", "appid": api_key}
 
         response = requests.get(endpoint, params=params)
+        if response.status_code == 401:
+            raise ValueError("Invalid or expired OpenWeather API key.")
         response.raise_for_status()
 
         df = pd.json_normalize(response.json()["list"])
@@ -41,14 +45,15 @@ with DAG(
         task_id="extract_weather_data",
         python_callable=_extract_openweather_data,
         requirements=["requests", "pandas"],
-        system_site_packages=True,
+        system_site_packages=False,
         op_args=[Variable.get("OPENWEATHER_API_KEY")],
     )
 
-    # task 2 - upload to GCS
+    # Task 2 – Upload the CSV to Google Cloud Storage
     def _upload_to_gcs(ds: str, **kwargs):
         ti = kwargs["ti"]
         csv_data = ti.xcom_pull(task_ids="extract_weather_data")
+
         hook = GCSHook()
         hook.upload(
             bucket_name="wether_forcasting_rawzone",
@@ -63,7 +68,7 @@ with DAG(
         op_kwargs={"ds": "{{ ds }}"},
     )
 
-    # task 3 - trigger next DAG
+    # Task 3 – Trigger the transformation DAG
     trigger_transform_dag = TriggerDagRunOperator(
         task_id="trigger_data_transform_dag",
         trigger_dag_id="transformed_wether_data_to_bq",
